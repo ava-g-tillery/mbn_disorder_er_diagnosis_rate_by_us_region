@@ -1,0 +1,154 @@
+#Project: Mental Health Related ER Visits Across US Regions
+#Name: Ava Tillery
+#Date: June 2026
+
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+#Cannot find function? Put the package in library!
+
+#Clean the data.
+  #Remove Column "Leading 10 Ranking"
+     ERvisits$`Leading 10 Ranking` <- NULL
+  #Remove Column "Lower 95% CI"
+     ERvisits$`Lower 95% CI` <- NULL
+  #Remove Column "Upper 95% CI"
+     ERvisits$`Upper 95% CI` <- NULL
+  #Remove Column "Reliable"
+     ERvisits$Reliable <- NULL
+  #Show Only "By Primary Diagnosis" Measure Response Variable ++++++
+  #Show Only "Visit rate (per 1,000 people)" Estimate Type Variable
+     ERvisits <- ERvisits[-c(1:3388), ]
+     ERvisits <- ERvisits[-c(1695:3388) ,]
+      #Now we have only "By primary diagnosis" by visit rate from 2016 to 2022.
+  #Rename Diagnosis Variable "7. Mental, behavioral, and neurodevelopmental disorders" to "MBN disorders"
+     #Unnecessary, I will delete later. Skip to next step.
+  #Show Only Diagnosis "MBN disorders" Response Variable
+     ERvisits <- ERvisits[-c(1:154) ,]
+          #2016 HWP (Half-way Point)
+     ERvisits <- ERvisits[-c(23:242) ,]
+          #2016 Done
+     ERvisits <- ERvisits[-c(45:264) ,]
+          #2017 Done
+     ERvisits <- ERvisits[-c(67:286) ,]
+          #2018 Done
+     ERvisits <- ERvisits[-c(89:308) ,]
+          #2019 Done
+          #Overall HWP
+     ERvisits <- ERvisits[-c(111:330) ,]
+          #2020 Done
+     ERvisits <- ERvisits[-c(133:352) ,]
+          #2021 Done
+     ERvisits <- ERvisits[-c(155:220) ,]
+  #Show Only Group "By region"
+     ERvisits <- ERvisits[-c(1:11) ,]
+          #2016 Done
+     ERvisits <- ERvisits[-c(5:22) ,]
+          #2017 Done
+     ERvisits <- ERvisits[-c(9:26) ,]
+          #2018 Done
+     ERvisits <- ERvisits[-c(13:30) ,]
+          #2019 Done
+     ERvisits <- ERvisits[-c(17:34) ,]
+          #2020 Done
+     ERvisits <- ERvisits[-c(21:38) ,]
+          #2021 Done
+     ERvisits <- ERvisits[-c(25:42) ,]
+     ERvisits <- ERvisits[-c(29:35) ,]
+          #2022 Done
+  #Rename Column from "Subgroup" to "USRegion"
+     ERvisits <- rename(ERvisits, "USRegion" = Subgroup)
+  #Rename Column from "Measure" to "Diagnosis"
+     ERvisits <- rename(ERvisits, Diagnosis = Measure)
+  #Rename Column from "Measure Type" to "Measure"
+     ERvisits <- rename(ERvisits, Measure = "Measure Type")
+  #Rename Column from "Standard Error" to "SE"
+     ERvisits <- rename(ERvisits, SE = "Standard Error")
+  #Remove Column "Group"
+     ERvisits$Group <- NULL
+  #Remove Column "Estimate Type"
+     ERvisits$`Estimate Type` <- NULL
+  #Rename Column from "Estimate" to "Rate"
+     ERvisits <- rename(ERvisits, Rate = Estimate)
+  #Remove Column "Measure"
+      ERvisits$Measure <- NULL
+  #Remove Column "Diagnosis"
+     ERvisits$Diagnosis <- NULL
+  #Save csv
+     write_csv(ERvisits, "MBNDiagnosis.csv")
+#Create Table of Means and Error
+  summary <- MBNDiagnosis %>% group_by(USRegion) %>%
+    summarise(
+      meanvisits = mean(Rate),
+      sdvisits = sd(Rate),
+      n = n(),  # Number of observations
+      sevisits= sdvisits / sqrt(n),  # Standard Error
+      se2= sevisits*2
+    )
+#Create Bar Graph
+  summary_df <- summary
+  ggplot(summary_df,
+         aes(x = USRegion,
+             y = meanvisits,
+             fill = USRegion)) +
+    geom_col() +
+    geom_errorbar(aes(ymin = meanvisits - se2,
+                      ymax = meanvisits + se2),
+                  width = 0.2,
+                  color = "black") +
+    scale_fill_manual(values = c(
+      Midwest = "#F8766D",
+      Northeast = "#7CAE00",
+      South = "#00BFC4",
+      West = "#C77CFF"
+    )) +
+    scale_y_continuous(n.breaks = 8) +
+    theme_bw() +
+    labs(
+      title = "Average Annual ER Diagnosis Rate for MBN Disorders",
+      subtitle = "by United States Region between 2016 and 2022",
+      x = "U.S. Region",
+      y = "Diagnosis Rate (per 1,000 Civilians)"
+    ) +
+    theme(legend.position = "none")
+#Create Line Graph
+  # Make sure Year is numeric
+  MBNDiagnosis$Year <- as.numeric(MBNDiagnosis$Year)
+  
+  # Line Graph
+  ggplot(MBNDiagnosis,
+         aes(x = Year,
+             y = Rate,
+             color = USRegion,
+             group = USRegion)) +
+    
+    geom_line(size = 1.2) +
+    geom_point(size = 2) +
+    
+    geom_errorbar(
+      aes(ymin = Rate - SE,
+          ymax = Rate + SE),
+      width = 0.1,
+      alpha = 0.5,
+      size = 0.5
+    )+
+    
+    theme_bw() +
+    
+    scale_x_continuous(breaks = 2016:2022) +
+    
+    labs(
+      title = "Annual ER Diagnosis Rate for MBN Disorders",
+      subtitle = "By United States Region between 2016 and 2022",
+      x = "Year",
+      y = "Diagnosis Rate (per 1,000 Civilians)",
+      color = "U.S. Region"
+    )
+#Run ANOVA
+  MBNDiagnosis$USRegion <- as.factor(MBNDiagnosis$USRegion)
+  anova_model <- aov(Rate ~ USRegion, data = MBNDiagnosis)
+  summary(anova_model)  
+  TukeyHSD(anova_model)
+  plot(TukeyHSD(anova_model))
+  
